@@ -849,6 +849,7 @@ instructions constituting the current statement are marked, if available."""
         line_info = None
         frame = gdb.selected_frame()  # PC is here
         disassemble = frame.architecture().disassemble
+        pc_index = 0
         try:
             # try to fetch the function boundaries using the disassemble command
             output = run('disassemble').split('\n')
@@ -868,8 +869,8 @@ instructions constituting the current statement are marked, if available."""
         except (gdb.error, StopIteration):
             # if it is not possible (stripped binary or the PC is not present in
             # the output of `disassemble` as per issue #31) start from PC and
-            # end after twice the context
-            asm = disassemble(frame.pc(), count=2 * self.context + 1)
+            # end after the context to keep the window size
+            asm = disassemble(frame.pc(), count=self.context + 1)
         # fetch function start if available
         func_start = None
         if self.show_function and frame.name():
@@ -897,6 +898,9 @@ instructions constituting the current statement are marked, if available."""
         max_length = max(instr['length'] for instr in asm)
         inferior = gdb.selected_inferior()
         out = []
+        # add leading empty lines, if necessary, to avoid window resizing
+        for _ in range(self.context - pc_index):
+            out.insert(0, '')
         for index, instr in enumerate(asm):
             addr = instr['addr']
             length = instr['length']
@@ -944,6 +948,10 @@ instructions constituting the current statement are marked, if available."""
                 func_info = ansi(func_info, R.style_low)
             out.append(format_string.format(addr_str, indicator,
                                             opcodes, func_info, text))
+        # add trailing empty lines, if necessary, to avoid window resizing
+        for _ in range(self.context * 2 + 1 - len(out)):
+            out.append( '')
+
         return out
 
     def attributes(self):
